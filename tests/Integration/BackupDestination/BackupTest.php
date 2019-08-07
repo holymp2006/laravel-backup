@@ -1,11 +1,12 @@
 <?php
 
-namespace Spatie\Backup\Test\Integration\BackupCollectionTest;
+namespace Spatie\Backup\Test\Integration\BackupDestination;
 
 use Storage;
 use Carbon\Carbon;
 use Spatie\Backup\BackupDestination\Backup;
 use Spatie\Backup\Test\Integration\TestCase;
+use Spatie\Backup\BackupDestination\BackupDestinationFactory;
 
 class BackupTest extends TestCase
 {
@@ -30,13 +31,13 @@ class BackupTest extends TestCase
 
         $this->assertTrue($backup->exists());
 
-        $this->assertTrue(file_exists($fullPath));
+        $this->assertFileExists($fullPath);
 
         $backup->delete();
 
         $this->assertFalse($backup->exists());
 
-        $this->assertFalse(file_exists($fullPath));
+        $this->assertFileNotExists($fullPath);
     }
 
     /** @test */
@@ -59,6 +60,43 @@ class BackupTest extends TestCase
         $backup->delete();
 
         $this->assertSame(0, $backup->size());
+    }
+
+    /** @test */
+    public function it_push_backup_extra_option_to_write_stream_if_set()
+    {
+        $this->app['config']->set('filesystems.disks.s3-test-backup', [
+            'driver' => 's3',
+
+            'backup_options' => [
+                'StorageClass' => 'COLD',
+            ],
+        ]);
+
+        $this->app['config']->set('backup.backup.destination.disks', [
+            's3-test-backup',
+        ]);
+
+        $backupDestination = BackupDestinationFactory::createFromArray(config('backup.backup'))->first();
+
+        $this->assertEquals(['StorageClass' => 'COLD'], $backupDestination->getDiskOptions());
+    }
+
+    /** @test */
+    public function it_push_empty_default_backup_extra_option_to_write_stream_if_not_set()
+    {
+        $this->app['config']->set('filesystems.disks.s3-test-backup', [
+            'driver' => 'local',
+
+        ]);
+
+        $this->app['config']->set('backup.backup.destination.disks', [
+            'local',
+        ]);
+
+        $backupDestination = BackupDestinationFactory::createFromArray(config('backup.backup'))->first();
+
+        $this->assertSame([], $backupDestination->getDiskOptions());
     }
 
     protected function getBackupForFile(string $name, int $ageInDays = 0, string $contents = ''): Backup

@@ -14,14 +14,19 @@ class CleanupJob
     /** @var \Illuminate\Support\Collection */
     protected $backupDestinations;
 
-    /** @var \Spatie\Backup\Tasks\Cleanup\Strategies\CleanupStrategy */
+    /** @var \Spatie\Backup\Tasks\Cleanup\CleanupStrategy */
     protected $strategy;
 
-    public function __construct(Collection $backupDestinations, CleanupStrategy $strategy)
+    /** @var bool */
+    protected $sendNotifications = true;
+
+    public function __construct(Collection $backupDestinations, CleanupStrategy $strategy, bool $disableNotifications = false)
     {
         $this->backupDestinations = $backupDestinations;
 
         $this->strategy = $strategy;
+
+        $this->sendNotifications = ! $disableNotifications;
     }
 
     public function run()
@@ -35,15 +40,24 @@ class CleanupJob
                 consoleOutput()->info("Cleaning backups of {$backupDestination->backupName()} on disk {$backupDestination->diskName()}...");
 
                 $this->strategy->deleteOldBackups($backupDestination->backups());
-                event(new CleanupWasSuccessful($backupDestination));
+                $this->sendNotification(new CleanupWasSuccessful($backupDestination));
 
-                $usedStorage = Format::humanReadableSize($backupDestination->usedStorage());
+                $usedStorage = Format::humanReadableSize($backupDestination->fresh()->usedStorage());
                 consoleOutput()->info("Used storage after cleanup: {$usedStorage}.");
             } catch (Exception $exception) {
                 consoleOutput()->error("Cleanup failed because: {$exception->getMessage()}.");
 
-                event(new CleanupHasFailed($exception));
+                $this->sendNotification(new CleanupHasFailed($exception));
+
+                throw $exception;
             }
         });
+    }
+
+    protected function sendNotification($notification)
+    {
+        if ($this->sendNotifications) {
+            event($notification);
+        }
     }
 }

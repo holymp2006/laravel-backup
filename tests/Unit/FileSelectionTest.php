@@ -2,10 +2,11 @@
 
 namespace Spatie\Backup\Test\Unit;
 
+use PHPUnit\Framework\TestCase;
 use Spatie\Backup\Test\TestHelper;
 use Spatie\Backup\Tasks\Backup\FileSelection;
 
-class FileSelectionTest extends \PHPUnit_Framework_TestCase
+class FileSelectionTest extends TestCase
 {
     /** @string */
     protected $sourceDirectory;
@@ -17,14 +18,19 @@ class FileSelectionTest extends \PHPUnit_Framework_TestCase
         $this->sourceDirectory = (new TestHelper())->getStubDirectory();
     }
 
+    protected function assertSameArrayContent($expected, $actual, $message = '')
+    {
+        $this->assertCount(count($expected), array_intersect($expected, $actual), $message);
+    }
+
     /** @test */
     public function it_can_select_all_the_files_in_a_directory_and_subdirectories()
     {
         $fileSelection = new FileSelection($this->sourceDirectory);
 
-        $this->assertSame(
-            $this->getTestFiles([
+        $testFiles = $this->getTestFiles([
                 '.dotfile',
+                '1Mb.file',
                 'directory1/directory1/file1.txt',
                 'directory1/directory1/file2.txt',
                 'directory1/file1.txt',
@@ -33,9 +39,10 @@ class FileSelectionTest extends \PHPUnit_Framework_TestCase
                 'file1.txt',
                 'file2.txt',
                 'file3.txt',
-            ]),
-            iterator_to_array($fileSelection->selectedFiles())
-        );
+            ]);
+        $selectedFiles = iterator_to_array($fileSelection->selectedFiles());
+
+        $this->assertSameArray($testFiles, $selectedFiles);
     }
 
     /** @test */
@@ -44,16 +51,17 @@ class FileSelectionTest extends \PHPUnit_Framework_TestCase
         $fileSelection = (new FileSelection($this->sourceDirectory))
                         ->excludeFilesFrom("{$this->sourceDirectory}/directory1");
 
-        $this->assertSame(
-            $this->getTestFiles([
+        $testFiles = $this->getTestFiles([
                 '.dotfile',
+                '1Mb.file',
                 'directory2/directory1/file1.txt',
                 'file1.txt',
                 'file2.txt',
                 'file3.txt',
-            ]),
-            iterator_to_array($fileSelection->selectedFiles())
-        );
+            ]);
+        $selectedFiles = iterator_to_array($fileSelection->selectedFiles());
+
+        $this->assertSameArray($testFiles, $selectedFiles);
     }
 
     /** @test */
@@ -62,17 +70,18 @@ class FileSelectionTest extends \PHPUnit_Framework_TestCase
         $fileSelection = (new FileSelection($this->sourceDirectory))
             ->excludeFilesFrom("{$this->sourceDirectory}/*/directory1");
 
-        $this->assertSame(
-            $this->getTestFiles([
+        $testFiles = $this->getTestFiles([
                 '.dotfile',
+                '1Mb.file',
                 'directory1/file1.txt',
                 'directory1/file2.txt',
                 'file1.txt',
                 'file2.txt',
                 'file3.txt',
-            ]),
-            iterator_to_array($fileSelection->selectedFiles())
-        );
+            ]);
+        $selectedFiles = iterator_to_array($fileSelection->selectedFiles());
+
+        $this->assertSameArray($testFiles, $selectedFiles);
     }
 
     /** @test */
@@ -83,13 +92,14 @@ class FileSelectionTest extends \PHPUnit_Framework_TestCase
             $this->sourceDirectory.'/directory2/directory1',
         ]));
 
-        $this->assertSame(
+        $this->assertSameArrayContent(
             $this->getTestFiles([
-                'directory1/directory1/file1.txt',
                 'directory1/directory1/file2.txt',
+                'directory1/directory1/file1.txt',
                 'directory2/directory1/file1.txt',
             ]),
-            iterator_to_array($fileSelection->selectedFiles()));
+            iterator_to_array($fileSelection->selectedFiles())
+        );
     }
 
     /** @test */
@@ -102,16 +112,17 @@ class FileSelectionTest extends \PHPUnit_Framework_TestCase
                 'file2.txt',
             ]));
 
-        $this->assertSame(
-            $this->getTestFiles([
+        $testFiles = $this->getTestFiles([
                 '.dotfile',
+                '1Mb.file',
                 'directory1/file1.txt',
                 'directory1/file2.txt',
                 'file1.txt',
                 'file3.txt',
-            ]),
-            iterator_to_array($fileSelection->selectedFiles())
-        );
+            ]);
+        $selectedFiles = iterator_to_array($fileSelection->selectedFiles());
+
+        $this->assertSameArray($testFiles, $selectedFiles);
     }
 
     /** @test */
@@ -161,5 +172,12 @@ class FileSelectionTest extends \PHPUnit_Framework_TestCase
         }, $relativePaths);
 
         return $absolutePaths;
+    }
+
+    protected function assertSameArray(array $array1, array $array2)
+    {
+        sort($array1);
+        sort($array2);
+        $this->assertSame($array1, $array2);
     }
 }
